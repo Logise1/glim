@@ -246,7 +246,7 @@ endwhile
 
                 for (let i = 0; i < lines.length; i++) {
                     const lineNum = i + 1;
-                    let line = lines[i];
+                    let line = lines[i].replace(/\u00A0/g, " "); // Normalize non-breaking spaces
                     
                     const commentIndex = line.indexOf('#');
                     if (commentIndex !== -1) {
@@ -268,96 +268,81 @@ endwhile
                     }
 
                     let instruction = { line: lineNum };
-                    let parsed = false;
-
+                    
                     try {
-                        // Handle multi-word commands first
-                        if (trimmedLine.startsWith('play sound ')) {
-                            instruction.opcode = 'PLAYSOUND';
-                            const valueStr = trimmedLine.substring(11).trim();
-                            if (!valueStr) throw `'play sound' necesita un nombre de sonido.`;
-                            instruction.value = this.parseExpression(valueStr);
-                            parsed = true;
-                        } else if (trimmedLine.startsWith('create array ')) {
-                            instruction.opcode = 'CREATE_ARRAY';
-                            const arg = trimmedLine.substring(13).trim();
-                            if (!arg) throw `'create array' necesita un nombre.`;
-                            instruction.arg = arg;
-                            parsed = true;
+                        let parsed = false;
+                        // Handle multi-word commands first as they are more specific
+                        if (trimmedLine.toLowerCase().startsWith('play sound ')) {
+                           instruction.opcode = 'PLAYSOUND';
+                           instruction.value = this.parseExpression(trimmedLine.substring(11).trim());
+                           parsed = true;
+                        } else if (trimmedLine.toLowerCase().startsWith('create array ')) {
+                           instruction.opcode = 'CREATE_ARRAY';
+                           instruction.arg = trimmedLine.substring(13).trim();
+                           parsed = true;
+                        } else if (trimmedLine.toLowerCase().match(/^set\s+.+\s+to\s+.+/i)) {
+                           instruction.opcode = 'SET';
+                           const parts = trimmedLine.substring(4).split(/\s+to\s+/i);
+                           instruction.target = this.parseTarget(parts[0].trim());
+                           instruction.value = this.parseExpression(parts[1].trim());
+                           parsed = true;
                         }
 
                         if (!parsed) {
                             const parts = trimmedLine.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
                             const command = parts[0].toLowerCase();
                             const isAssignment = parts.length > 1 && parts[1] === '=';
-                            const knownCommands = ['init', 'delete', 'goto', 'call', 'log', 'sleep', 'if', 'while', 'endwhile', 'stop', 'playsound'];
-
-                            let instructionType;
-                            if (knownCommands.includes(command)) {
-                                instructionType = command;
-                            } else if (isAssignment) {
-                                instructionType = 'set_shorthand';
+                            
+                            if (isAssignment) {
+                                instruction.opcode = 'SET';
+                                instruction.target = this.parseTarget(parts[0]);
+                                instruction.value = this.parseExpression(parts.slice(2).join(' '));
                             } else if (command.endsWith(':')) {
-                                instructionType = 'label';
+                                labels[command.slice(0, -1)] = instructions.length;
+                                instruction.opcode = 'NOOP';
                             } else {
-                                throw `Comando desconocido: '${command}'.`;
-                            }
-
-                            instruction.opcode = instructionType.toUpperCase();
-
-                            switch (instructionType) {
-                                case 'label':
-                                    labels[command.slice(0, -1)] = instructions.length;
-                                    instruction.opcode = 'NOOP';
-                                    break;
-                                case 'init': case 'delete': case 'goto': case 'call':
-                                    if (parts.length !== 2) throw `Comando '${command}' espera 1 argumento.`;
-                                    instruction.arg = parts[1];
-                                    break;
-                                case 'stop':
-                                    break; // No arguments needed
-                                case 'playsound': // Alias for 'play sound'
-                                    instruction.opcode = 'PLAYSOUND';
-                                    if (parts.length !== 2) throw `Comando 'playsound' espera 1 argumento.`;
-                                    instruction.value = this.parseExpression(parts[1]);
-                                    break;
-                                case 'log': {
-                                    const valueStr = trimmedLine.substring(3).trim();
-                                    instruction.value = this.parseExpression(valueStr);
-                                    break;
-                                }
-                                case 'sleep': {
-                                    const durationStr = parts.slice(1).join(' ');
-                                    instruction.duration = this.parseExpression(durationStr);
-                                    break;
-                                }
-                                case 'set_shorthand': {
-                                    instruction.opcode = 'SET';
-                                    instruction.target = this.parseTarget(parts[0]);
-                                    instruction.value = this.parseExpression(parts.slice(2).join(' '));
-                                    break;
-                                }
-                                case 'if': {
-                                    const conditionStr = trimmedLine.substring(2).trim();
-                                    instruction.condition = this.parseExpression(conditionStr);
-                                    instruction.targetPc = -1; // Placeholder
-                                    ifStack.push({ index: instructions.length, indent: indent });
-                                    break;
-                                }
-                                case 'while': {
-                                    const conditionStr = trimmedLine.substring(5).trim();
-                                    instruction.condition = this.parseExpression(conditionStr);
-                                    instruction.targetPc = -1;
-                                    blockStack.push({ type: 'while', index: instructions.length });
-                                    break;
-                                }
-                                case 'endwhile': {
-                                    let block = blockStack.pop();
-                                    if (!block || block.type !== 'while') throw `'endwhile' sin un 'while' correspondiente.`;
-                                    instruction.opcode = 'JUMP';
-                                    instruction.targetPc = block.index;
-                                    instructions[block.index].targetPc = instructions.length + 1;
-                                    break;
+                                instruction.opcode = command.toUpperCase();
+                                switch (command) {
+                                    case 'init': case 'delete': case 'goto': case 'call':
+                                        if (parts.length !== 2) throw `Comando '${command}' espera 1 argumento.`;
+                                        instruction.arg = parts[1];
+                                        break;
+                                    case 'stop':
+                                        break;
+                                    case 'playsound':
+                                        instruction.opcode = 'PLAYSOUND';
+                                        if (parts.length !== 2) throw `'playsound' espera 1 argumento.`;
+                                        instruction.value = this.parseExpression(parts[1]);
+                                        break;
+                                    case 'log':
+                                        instruction.value = this.parseExpression(trimmedLine.substring(3).trim());
+                                        break;
+                                    case 'sleep':
+                                        instruction.duration = this.parseExpression(parts.slice(1).join(' '));
+                                        break;
+                                    case 'if':
+                                        instruction.opcode = 'JUMP_IF_FALSE';
+                                        instruction.condition = this.parseExpression(trimmedLine.substring(2).trim());
+                                        instruction.targetPc = -1;
+                                        ifStack.push({ index: instructions.length, indent: indent });
+                                        break;
+                                    case 'while':
+                                        instruction.opcode = 'JUMP_IF_FALSE';
+                                        instruction.condition = this.parseExpression(trimmedLine.substring(5).trim());
+                                        instruction.targetPc = -1;
+                                        blockStack.push({ type: 'while', index: instructions.length });
+                                        break;
+                                    case 'endwhile':
+                                        let block = blockStack.pop();
+                                        if (!block || block.type !== 'while') throw `'endwhile' sin un 'while' correspondiente.`;
+                                        instruction.opcode = 'JUMP';
+                                        instruction.targetPc = block.index;
+                                        if(instructions[block.index]) {
+                                            instructions[block.index].targetPc = instructions.length + 1;
+                                        }
+                                        break;
+                                    default:
+                                        throw `Comando desconocido: '${command}'.`;
                                 }
                             }
                         }
