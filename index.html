@@ -186,38 +186,41 @@
         // --- ENGINE CONSTANTS & STATE ---
         const instructionLimit = 5000;
         const frameDelay = 1000 / 60; // 60 FPS
-        const inputState = { keys: {} };
+        const inputState = { keys: {}, mouse: {} };
         let processes = [];
         let lastFrameTime = 0;
         let currentProjectName = null, isProjectDirty = false;
         window.currentFileHandle = null;
 
         const defaultCode = `# ¡Bienvenido a Glim!
-# Usa las teclas A y D para mover el jugador.
-# El cursor azul seguirá tu ratón.
+# Usa las Flechas para mover al jugador.
+# Haz clic para teletransportarlo a la posición del cursor.
+# Mantén Espacio para que el jugador cambie de color.
 
-# Inicializa el jugador y el cursor
 init jugador
 jugador.color = "#f59e0b" # Naranja
 jugador.size = 25
-jugador.y = -150
-
-init mira
-mira.color = "#38bdf8" # Cian
-mira.size = 15
 
 # Bucle principal del juego
 while 1 = 1
-  # Mover el jugador con las teclas
-  if key a pressed
+  # Mover el jugador con las flechas
+  if key flechaizquierda pressed
     jugador.x = jugador.x - 5
-  
-  if key d pressed
+  if key flechaderecha pressed
     jugador.x = jugador.x + 5
+  if key flechaarriba pressed
+    jugador.y = jugador.y + 5
+  if key flechaabajo pressed
+    jugador.y = jugador.y - 5
 
-  # El cursor sigue al ratón
-  set mira.x to mouse_x
-  set mira.y to mouse_y
+  # Cambiar color con la barra espaciadora
+  if key espacio pressed
+    jugador.color = "#38bdf8" # Cian
+  
+  # Teletransportar al jugador con un clic
+  if mouse izquierdo pressed
+    jugador.x = mouse_x
+    jugador.y = mouse_y
 
   sleep 0.016
 endwhile
@@ -388,10 +391,21 @@ endwhile
                 const output = [];
                 const operators = [];
 
-                // Handle 'key ... pressed' as a special case before tokenizing
-                const keyPressMatch = str.match(/^key\s+([^\s]+)\s+pressed$/i);
-                if (keyPressMatch) {
-                    return [{ type: 'KEY_PRESSED', key: keyPressMatch[1] }];
+                const specialPressMatch = str.match(/^(key|mouse)\s+([^\s]+)\s+pressed$/i);
+                if (specialPressMatch) {
+                    const type = specialPressMatch[1].toLowerCase();
+                    let value = specialPressMatch[2].toLowerCase();
+                    if (type === 'key') {
+                        const keyMap = { 'espacio': ' ', 'flechaarriba': 'arrowup', 'flechaabajo': 'arrowdown', 'flechaizquierda': 'arrowleft', 'flechaderecha': 'arrowright' };
+                        return [{ type: 'KEY_PRESSED', key: keyMap[value] || value }];
+                    } else { // mouse
+                        const mouseMap = { 'izquierdo': 0, 'medio': 1, 'derecho': 2 };
+                        if (mouseMap.hasOwnProperty(value)) {
+                            return [{ type: 'MOUSE_PRESSED', button: mouseMap[value] }];
+                        } else {
+                            throw `Botón del ratón desconocido: '${value}'. Usa 'izquierdo', 'medio', o 'derecho'.`;
+                        }
+                    }
                 }
 
                 const tokenRegex = /\s*("[^"]*"|'[^']*'|\b(and|or)\b|[a-zA-Z_][\w.]*|-?\d+(?:\.\d+)?|[<>=]+|[+\-*/()])\s*/g;
@@ -555,6 +569,8 @@ endwhile
                 for(const token of tokens) {
                     if (token.type === 'KEY_PRESSED') {
                         stack.push(!!inputState.keys[token.key]);
+                    } else if (token.type === 'MOUSE_PRESSED') {
+                        stack.push(!!inputState.mouse[token.button]);
                     } else if (token.type.startsWith('LITERAL')) {
                         stack.push(token.value);
                     } else if (token.type === 'VARIABLE') {
@@ -929,15 +945,19 @@ endwhile
 
 
             // Input Listeners
-            window.addEventListener('keydown', e => { inputState.keys[e.key] = true; });
-            window.addEventListener('keyup', e => { inputState.keys[e.key] = false; });
-            document.getElementById('stage').addEventListener('mousemove', e => {
+            window.addEventListener('keydown', e => { inputState.keys[e.key.toLowerCase()] = true; });
+            window.addEventListener('keyup', e => { inputState.keys[e.key.toLowerCase()] = false; });
+            
+            const stageCanvas = document.getElementById('stage');
+            stageCanvas.addEventListener('mousemove', e => {
                 const rect = e.target.getBoundingClientRect();
                 const canvasX = e.clientX - rect.left;
                 const canvasY = e.clientY - rect.top;
                 variables.mouse_x = canvasX - stageWidth / 2;
                 variables.mouse_y = -(canvasY - stageHeight / 2);
             });
+            stageCanvas.addEventListener('mousedown', e => { inputState.mouse[e.button] = true; });
+            stageCanvas.addEventListener('mouseup', e => { inputState.mouse[e.button] = false; });
 
              setupCostumeManager(); 
              setupSoundManager();
