@@ -270,7 +270,7 @@ endwhile
                     const parts = trimmedLine.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
                     let command = parts[0].toLowerCase();
                     const isAssignment = parts.length > 1 && parts[1] === '=';
-                    const knownCommands = ['init', 'delete', 'goto', 'call', 'log', 'sleep', 'create', 'set', 'if', 'while', 'endwhile'];
+                    const knownCommands = ['init', 'delete', 'goto', 'call', 'log', 'sleep', 'create', 'set', 'if', 'while', 'endwhile', 'stop'];
 
                     let instructionType;
                     try {
@@ -297,6 +297,8 @@ endwhile
                             case 'call':
                                 if (parts.length !== 2) throw `Comando '${command}' espera 1 argumento.`;
                                 instruction.arg = parts[1];
+                                break;
+                            case 'stop':
                                 break;
                             case 'log': {
                                 if (parts.length < 2) throw `Comando 'log' necesita un mensaje o valor.`;
@@ -539,6 +541,9 @@ endwhile
                                     process.waitUntil = timestamp + durationSeconds * 1000;
                                     break;
                                 }
+                                case 'STOP':
+                                    stopExecution();
+                                    return; // End the entire VM frame
                             }
                         } catch(e) {
                             logToConsole(`Error de ejecución en línea ${instruction.line}: ${e.message}`, 'error');
@@ -817,7 +822,7 @@ endwhile
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
         }
 
-        // --- UI Management ---
+        // --- UI Management & I/O ---
         function markProjectAsDirty() {
             if (currentProjectName && !isProjectDirty) {
                 isProjectDirty = true;
@@ -929,12 +934,101 @@ endwhile
             document.getElementById('sound-gallery').appendChild(div);
         }
 
+        async function exportProject() {
+            if (!editor) return;
+            const zip = new JSZip();
+            zip.file("code.glim", editor.getValue());
+            
+            const meta = { width: stageWidth, height: stageHeight };
+            zip.file("meta.json", JSON.stringify(meta));
+
+            const costumesFolder = zip.folder("costumes");
+            for (const [name, img] of Object.entries(costumes)) {
+                const response = await fetch(img.src);
+                costumesFolder.file(`${name}.png`, await response.blob());
+            }
+
+            const soundsFolder = zip.folder("sounds");
+             for (const [name, audio] of Object.entries(sounds)) {
+                const response = await fetch(audio.src);
+                soundsFolder.file(`${name}.mp3`, await response.blob());
+            }
+
+            const content = await zip.generateAsync({type:"blob"});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = 'proyecto.glim';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            logToConsole('Proyecto exportado como "proyecto.glim"', 'log');
+        }
+
+        async function processImportedFile(file) {
+            logToConsole(`Importando ${file.name}...`, 'log');
+            stopExecution();
+            resetProjectState();
+            costumes = {}; sounds = {};
+            document.getElementById('costume-gallery').innerHTML = '';
+            document.getElementById('sound-gallery').innerHTML = '';
+            
+            try {
+                const zip = await JSZip.loadAsync(file);
+                
+                const codeFile = zip.file("code.glim");
+                if (codeFile) editor.setValue(await codeFile.async("string"));
+
+                const metaFile = zip.file("meta.json");
+                if (metaFile) {
+                    const meta = JSON.parse(await metaFile.async("string"));
+                    stageWidth = meta.width || 640;
+                    stageHeight = meta.height || 360;
+                    updateCanvas();
+                }
+
+                const promises = [];
+                zip.folder("costumes").forEach((relativePath, zipEntry) => {
+                    const promise = zipEntry.async("base64").then(base64 => {
+                        return new Promise((resolve) => {
+                            const img = new Image(); const costumeName = relativePath.split('.')[0];
+                            img.onload = () => { costumes[costumeName] = img; addCostumeToGallery(costumeName, img.src); resolve(); };
+                            img.src = "data:image/png;base64," + base64;
+                        });
+                    });
+                    promises.push(promise);
+                });
+
+                zip.folder("sounds").forEach((relativePath, zipEntry) => {
+                    const promise = zipEntry.async("blob").then(blob => {
+                         const soundName = relativePath.split('.')[0];
+                         const audio = new Audio(URL.createObjectURL(blob));
+                         sounds[soundName] = audio;
+                         addSoundToGallery(soundName);
+                    });
+                    promises.push(promise);
+                });
+
+                await Promise.all(promises);
+                logToConsole('Proyecto importado con éxito.', 'log');
+
+            } catch(e) {
+                logToConsole(`Error al importar: ${e.message}`, 'error');
+            }
+        }
+
+
         // --- Event Listeners and Initializers ---
         window.onload = () => {
             document.getElementById('runButton').addEventListener('click', () => { if (isRunning) stopExecution(); else startExecution(); });
             document.getElementById('menu-nuevo').addEventListener('click', (e) => { e.preventDefault(); stopExecution(); resetProjectState(); if (editor) editor.setValue(defaultCode); stageObjects = {}; costumes = {}; sounds = {}; document.getElementById('sound-gallery').innerHTML = ''; document.getElementById('costume-gallery').innerHTML = ''; updateCanvas(); });
-            
-            // Other menu items and modals setup...
+            document.getElementById('menu-exportar').addEventListener('click', (e) => { e.preventDefault(); exportProject(); });
+            document.getElementById('menu-importar').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('file-importer').click(); });
+            document.getElementById('file-importer').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) processImportedFile(file);
+                e.target.value = null; // Reset for next import
+            });
             
             document.getElementById('menu-mostrar-cuadricula').addEventListener('click', (e) => { e.preventDefault(); showGrid = !showGrid; e.target.classList.toggle('checked', showGrid); if (!isRunning) updateCanvas(); });
             document.getElementById('menu-mostrar-nombres').addEventListener('click', (e) => { e.preventDefault(); showNames = !showNames; e.target.classList.toggle('checked', showNames); if (!isRunning) updateCanvas(); });
@@ -957,6 +1051,7 @@ endwhile
             });
             stageCanvas.addEventListener('mousedown', e => { inputState.mouse[e.button] = true; });
             stageCanvas.addEventListener('mouseup', e => { inputState.mouse[e.button] = false; });
+            stageCanvas.addEventListener('contextmenu', e => e.preventDefault()); // Prevent right-click menu
 
              setupCostumeManager(); 
              setupSoundManager();
