@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glim - Editor de Proyectos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/editor/editor.main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2D2D30; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+        .menu-item-checkbox::before { content: '✓'; margin-right: 8px; visibility: hidden; }
+        .menu-item-checkbox.checked::before { visibility: visible; }
+        .modal { transition: opacity 0.2s ease-in-out; }
+        .error-line { background: rgba(255, 0, 0, 0.2); }
+        #stage { image-rendering: pixelated; cursor: crosshair; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-blue-800/80 backdrop-blur-sm shadow-lg w-full flex-shrink-0 z-20">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                 <div class="flex items-center gap-4">
+                     <div class="text-2xl font-bold text-white tracking-wider">Glim</div>
+                     <nav class="flex items-center gap-2">
+                         <div class="relative" id="menu-archivo-container">
+                             <button id="menu-archivo-button" class="px-4 py-2 text-white hover:bg-blue-700/60 rounded-md transition-colors">Archivo</button>
+                             <div id="menu-archivo-dropdown" class="hidden absolute left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-md shadow-xl py-1 z-30">
+                                 <a href="#" id="menu-nuevo" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Nuevo Proyecto</a>
+                                 <a href="#" id="menu-importar" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Importar...</a>
+                                 <a href="#" id="menu-exportar" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Exportar...</a>
+                             </div>
+                         </div>
+                         <div class="relative" id="menu-editar-container">
+                             <button id="menu-editar-button" class="px-4 py-2 text-white hover:bg-blue-700/60 rounded-md transition-colors">Editar</button>
+                             <div id="menu-editar-dropdown" class="hidden absolute left-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-md shadow-xl py-1 z-30">
+                                 <a href="#" id="menu-cambiar-tamano" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Cambiar tamaño...</a>
+                                 <a href="#" id="menu-cargar-extensiones" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Cargar Extensiones...</a>
+                                 <div class="border-t border-gray-700 my-1"></div>
+                                 <a href="#" id="menu-mostrar-cuadricula" class="menu-item-checkbox block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Mostrar Cuadrícula</a>
+                                 <a href="#" id="menu-mostrar-nombres" class="menu-item-checkbox block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Mostrar Nombres</a>
+                                 <a href="#" id="menu-mostrar-inspector" class="menu-item-checkbox block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Mostrar Inspector</a>
+                                 <div class="border-t border-gray-700 my-1"></div>
+                                 <a href="#" id="menu-auto-ejecucion" class="menu-item-checkbox block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Auto-ejecución</a>
+                             </div>
+                         </div>
+                     </nav>
+                 </div>
+                 <div>
+                      <button id="save-button" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                          Guardar
+                      </button>
+                 </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 p-4">
+        <!-- Left Column: Code Editor -->
+        <div class="flex flex-col bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
+            <div class="bg-gray-700 p-3 rounded-t-xl border-b border-gray-600 flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-4">
+                    <h2 class="font-semibold text-lg">Código</h2>
+                    <button id="costumes-button" class="text-sm bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded-md">Disfraces</button>
+                    <button id="sounds-button" class="text-sm bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded-md">Sonidos</button>
+                </div>
+            </div>
+            <div id="editor-container" class="w-full h-full flex-grow"></div>
+        </div>
+        
+        <!-- Right Column: Stage, Inspector, Console -->
+        <div id="right-column" class="grid grid-rows-[minmax(0,1fr)_auto_auto] gap-4">
+            <div class="flex flex-col bg-gray-800 rounded-xl shadow-2xl min-h-0">
+                <div class="bg-gray-700 p-3 rounded-t-xl border-b border-gray-600 flex justify-between items-center">
+                    <h2 class="font-semibold text-lg">Escenario</h2>
+                    <button id="runButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-1 px-4 rounded-lg transition-colors shadow-md text-sm">
+                        Ejecutar
+                    </button>
+                </div>
+                <div class="flex-grow p-2 relative flex items-center justify-center bg-black/20">
+                    <canvas id="stage" class="bg-gray-900/50 rounded-lg"></canvas>
+                </div>
+            </div>
+            <div id="inspector-panel" class="hidden flex-col bg-gray-800 rounded-xl shadow-2xl h-36">
+                <div class="bg-gray-700 p-3 rounded-t-xl border-b border-gray-600 flex justify-between items-center">
+                    <h2 class="font-semibold text-lg">Inspector</h2>
+                </div>
+                <div id="inspector-output" class="p-2 overflow-y-auto font-mono text-xs inspector-output flex-grow"></div>
+            </div>
+            <div class="flex flex-col bg-gray-800 rounded-xl shadow-2xl h-36">
+                <div class="bg-gray-700 p-3 rounded-t-xl border-b border-gray-600 flex justify-between items-center">
+                    <h2 class="font-semibold text-lg">Consola</h2>
+                    <button id="clear-console-button" class="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded">Limpiar</button>
+                </div>
+                <div id="console-output" class="p-2 overflow-y-auto font-mono text-sm console-output flex-grow"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="costume-modal" class="hidden modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-3xl p-6 border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Gestor de Disfraces</h2>
+                <button id="close-costume-modal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="bg-gray-900/50 p-4 rounded-md mb-4">
+                <label for="costume-uploader" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg cursor-pointer">Subir Imagen</label>
+                <input type="file" id="costume-uploader" class="hidden" accept="image/*">
+            </div>
+            <div id="costume-gallery" class="gallery grid grid-cols-3 md:grid-cols-5 gap-4 max-h-64 overflow-y-auto p-2 bg-gray-900/50 rounded-md"></div>
+        </div>
+    </div>
+    
+    <div id="sound-modal" class="hidden modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Gestor de Sonidos</h2>
+                <button id="close-sound-modal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+             <div class="bg-gray-900/50 p-4 rounded-md mb-4">
+                <label for="sound-uploader" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg cursor-pointer">Subir Audio</label>
+                <input type="file" id="sound-uploader" class="hidden" accept="audio/*,.wav,.mp3">
+            </div>
+            <div id="sound-gallery" class="gallery max-h-64 overflow-y-auto p-2 bg-gray-900/50 rounded-md space-y-2"></div>
+        </div>
+    </div>
+
+    <div id="resize-modal" class="hidden modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-sm p-6 border border-gray-700">
+            <h2 class="text-2xl font-bold mb-4">Cambiar Tamaño del Escenario</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="stage-width-input" class="block text-sm font-medium text-gray-300">Ancho</label>
+                    <input type="number" id="stage-width-input" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500">
+                </div>
+                 <div>
+                    <label for="stage-height-input" class="block text-sm font-medium text-gray-300">Alto</label>
+                    <input type="number" id="stage-height-input" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="cancel-resize-button" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md">Cancelar</button>
+                <button id="confirm-resize-button" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-md">Aceptar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="extension-manager-modal" class="hidden modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl p-6 border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Gestor de Extensiones</h2>
+                <button id="close-extension-modal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="bg-gray-900/50 p-4 rounded-md mb-4">
+                <label for="extension-uploader" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg cursor-pointer">Subir Extensión (.glimext)</label>
+                <input type="file" id="extension-uploader" class="hidden" accept=".glimext,.js">
+            </div>
+            <div id="extension-list" class="extension-list max-h-64 overflow-y-auto p-2 bg-gray-900/50 rounded-md space-y-2"></div>
+        </div>
+    </div>
+
+    <input type="file" id="file-importer" class="hidden" accept=".glim,application/zip">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.js"></script>
+    <script>
+        // --- GLOBAL STATE ---
+        let editor;
+        let stageObjects = {}, variables = {};
+        let costumes = {}, sounds = {}, currentBackground = null;
+        let isRunning = false, compiledProgram = null;
+        
+        // --- CONFIGURABLE STATE ---
+        let stageWidth = 640, stageHeight = 360, showGrid = false, showNames = false, showInspector = false, autoRunEnabled = false;
+        
+        // --- ENGINE CONSTANTS & STATE ---
+        const instructionLimit = 5000;
+        const frameDelay = 1000 / 60; // 60 FPS
+        const inputState = { keys: {} };
+        let processes = [];
+        let lastFrameTime = 0;
+        let currentProjectName = null, isProjectDirty = false;
+        window.currentFileHandle = null;
+
+        const defaultCode = `# ¡Bienvenido a Glim!
+# Este es un ejemplo para empezar.
+# Haz clic en "Ejecutar" para verlo en acción.
+
+init bola
+bola.color = "#38bdf8" # Color cian
+bola.size = 30
+
+# Variables para controlar el movimiento
+set velocidad_x to 4
+set velocidad_y to 3
+
+# Bucle principal infinito para la animación
+while 1 = 1
+  # Mover la bola
+  set bola.x to bola.x + velocidad_x
+  set bola.y to bola.y + velocidad_y
+
+  # Rebotar en los bordes horizontales (ancho/2)
+  if bola.x > 320 or bola.x < -320
+    set velocidad_x to velocidad_x * -1
+
+  # Rebotar en los bordes verticales (alto/2)
+  if bola.y > 180 or bola.y < -180
+    set velocidad_y to velocidad_y * -1
+
+  # Pequeña pausa para controlar la velocidad del bucle
+  sleep 0.016
+endwhile
+`;
+
+        // =================================================================
+        // COMPILER (Code -> Bytecode)
+        // =================================================================
+        const Compiler = {
+            compile(sourceCode) {
+                const lines = sourceCode.split('\n');
+                const instructions = [];
+                const labels = {};
+                const procedures = {};
+                const blockStack = [];
+                const ifStack = []; 
+
+                const getIndentation = (line) => line.search(/\S|$/);
+
+                const SyntaxError = (message, line) => {
+                    return { error: true, message, line };
+                };
+
+                for (let i = 0; i < lines.length; i++) {
+                    const lineNum = i + 1;
+                    let line = lines[i];
+                    
+                    const commentIndex = line.indexOf('#');
+                    if (commentIndex !== -1) {
+                         line = line.substring(0, commentIndex);
+                    }
+
+                    const indent = getIndentation(line);
+                    while (ifStack.length > 0 && indent <= ifStack[ifStack.length - 1].indent) {
+                        const ifBlock = ifStack.pop();
+                        if (instructions[ifBlock.index]) {
+                           instructions[ifBlock.index].targetPc = instructions.length;
+                        }
+                    }
+
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) {
+                        instructions.push({ opcode: 'NOOP', line: lineNum });
+                        continue;
+                    }
+
+                    const parts = trimmedLine.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+                    let command = parts[0].toLowerCase();
+                    let isAssignment = parts.length > 1 && parts[1] === '=';
+
+                    if (isAssignment) {
+                        command = 'set_shorthand';
+                    }
+                    
+                    if (command.endsWith(':')) {
+                        labels[command.slice(0, -1)] = instructions.length;
+                        instructions.push({ opcode: 'NOOP', line: lineNum });
+                        continue;
+                    }
+
+                    let instruction = { opcode: command.toUpperCase(), line: lineNum };
+
+                    try {
+                        switch (command) {
+                            case 'init':
+                            case 'delete':
+                            case 'goto':
+                            case 'call':
+                                if (parts.length !== 2) throw `Comando '${command}' espera 1 argumento.`;
+                                instruction.arg = parts[1];
+                                break;
+                            case 'log': {
+                                if (parts.length < 2) throw `Comando 'log' necesita un mensaje o valor.`;
+                                const valueStr = trimmedLine.substring(3).trim();
+                                instruction.value = this.parseExpression(valueStr);
+                                break;
+                            }
+                            case 'sleep': {
+                                if (parts.length < 2) throw `Comando 'sleep' necesita una duración.`;
+                                const durationStr = parts.slice(1).join(' ');
+                                instruction.duration = this.parseExpression(durationStr);
+                                break;
+                            }
+                            case 'create':
+                                if (parts.length !== 3 || parts[1] !== 'array') throw `Sintaxis inválida. Use 'create array <nombre>'.`;
+                                instruction.opcode = 'CREATE_ARRAY';
+                                instruction.arg = parts[2];
+                                break;
+                            case 'set': {
+                                const toIndex = parts.indexOf('to');
+                                if (toIndex === -1 || toIndex < 1 || toIndex === parts.length - 1) throw `Sintaxis inválida. Use 'set <destino> to <valor>'.`;
+                                const targetStr = parts.slice(1, toIndex).join(' ');
+                                const valueStr = parts.slice(toIndex + 1).join(' ');
+                                instruction.target = this.parseTarget(targetStr);
+                                instruction.value = this.parseExpression(valueStr);
+                                break;
+                            }
+                             case 'set_shorthand': {
+                                instruction.opcode = 'SET';
+                                const targetStr = parts[0];
+                                const valueStr = parts.slice(2).join(' ');
+                                instruction.target = this.parseTarget(targetStr);
+                                instruction.value = this.parseExpression(valueStr);
+                                break;
+                            }
+                            case 'if': {
+                                const conditionStr = trimmedLine.substring(2).trim();
+                                if (!conditionStr) throw `Comando 'if' necesita una condición.`;
+                                instruction.opcode = 'JUMP_IF_FALSE';
+                                instruction.condition = this.parseExpression(conditionStr);
+                                instruction.targetPc = -1; // Placeholder
+                                ifStack.push({ index: instructions.length, indent: indent });
+                                break;
+                            }
+                            case 'while': {
+                                const conditionStr = trimmedLine.substring(5).trim();
+                                if (!conditionStr) throw `Comando 'while' necesita una condición.`;
+                                instruction.opcode = 'JUMP_IF_FALSE';
+                                instruction.condition = this.parseExpression(conditionStr);
+                                instruction.targetPc = -1; // Placeholder for end of loop
+                                blockStack.push({ type: 'while', index: instructions.length });
+                                break;
+                            }
+                             case 'endwhile': {
+                                let block = blockStack.pop();
+                                if (!block || block.type !== 'while') throw `'endwhile' sin un 'while' correspondiente.`;
+                                instruction.opcode = 'JUMP';
+                                instruction.targetPc = block.index;
+                                instructions[block.index].targetPc = instructions.length + 1;
+                                break;
+                            }
+                            default:
+                                throw `Comando desconocido: '${command}'.`;
+                        }
+                    } catch (e) {
+                        return SyntaxError(e, lineNum);
+                    }
+
+                    instructions.push(instruction);
+                }
+
+                while (ifStack.length > 0) {
+                    const ifBlock = ifStack.pop();
+                    instructions[ifBlock.index].targetPc = instructions.length;
+                }
+
+                if (blockStack.length > 0) {
+                    const danglingBlock = blockStack.pop();
+                    return SyntaxError(`Bloque '${danglingBlock.type}' no fue cerrado.`, instructions[danglingBlock.index].line);
+                }
+
+                return { instructions, labels, procedures };
+            },
+
+            parseTarget(str) {
+                if (str.includes('.')) {
+                    const [obj, prop] = str.split('.');
+                    return { type: 'PROPERTY', objName: obj, propName: prop };
+                }
+                return { type: 'VARIABLE', name: str };
+            },
+
+            parseExpression(str) {
+                const precedence = { 'or': 1, 'and': 2, '>': 3, '<': 3, '=': 3, '==': 3, '+': 4, '-': 4, '*': 5, '/': 5 };
+                const output = [];
+                const operators = [];
+
+                const tokenRegex = /\s*("[^"]*"|'[^']*'|\b(and|or)\b|[a-zA-Z_][\w.]*|-?\d+(?:\.\d+)?|[<>=]+|[+\-*/()])\s*/g;
+                let preTokens = [...str.matchAll(tokenRegex)].map(m => m[1]);
+
+                let tokens = [];
+                for(let i = 0; i < preTokens.length; i++) {
+                    const token = preTokens[i];
+                    if (token === '-' && (i === 0 || precedence[preTokens[i-1]] || preTokens[i-1] === '(' ) ) {
+                        const nextToken = preTokens[i+1];
+                        if(nextToken && !isNaN(parseFloat(nextToken))) {
+                            tokens.push(String(parseFloat(nextToken) * -1));
+                            i++;
+                        } else {
+                            tokens.push('negate'); 
+                        }
+                    } else {
+                        tokens.push(token);
+                    }
+                }
+                
+                tokens.forEach(token => {
+                    if (!isNaN(parseFloat(token)) && isFinite(token)) {
+                        output.push({ type: 'LITERAL_NUMBER', value: parseFloat(token) });
+                    } else if (token.startsWith('"') || token.startsWith("'")) {
+                        output.push({ type: 'LITERAL_STRING', value: token.slice(1, -1) });
+                    } else if (token in precedence) {
+                        while (operators.length && operators[operators.length - 1] !== '(' && precedence[operators[operators.length - 1]] >= precedence[token]) {
+                            output.push({ type: 'OPERATOR', value: operators.pop() });
+                        }
+                        operators.push(token);
+                    } else if (token === '(') {
+                        operators.push(token);
+                    } else if (token === ')') {
+                        while (operators.length && operators[operators.length - 1] !== '(') {
+                            output.push({ type: 'OPERATOR', value: operators.pop() });
+                        }
+                        if(operators.length === 0) throw new Error("Paréntesis desequilibrados en la expresión.");
+                        operators.pop(); 
+                    } else { 
+                         if (token.includes('.')) {
+                            const [obj, prop] = token.split('.');
+                            output.push({ type: 'PROPERTY', objName: obj, propName: prop });
+                        } else {
+                            output.push({ type: 'VARIABLE', name: token });
+                        }
+                    }
+                });
+
+                while (operators.length) {
+                    if(operators[operators.length - 1] === '(') throw new Error("Paréntesis desequilibrados en la expresión.");
+                    output.push({ type: 'OPERATOR', value: operators.pop() });
+                }
+                return output;
+            },
+        };
+
+
+        // =================================================================
+        // VIRTUAL MACHINE (Bytecode -> Execution)
+        // =================================================================
+        const VM = {
+            init(program) {
+                this.program = program;
+                this.processes = [];
+                this.cloneCounter = 0;
+            },
+
+            start() {
+                stageObjects = {};
+                variables = { camera_x: 0, camera_y: 0, camera_zoom: 1, mouse_x: 0, mouse_y: 0 };
+                this.cloneCounter = 0;
+                currentBackground = null;
+                
+                this.program.instructions.forEach(inst => {
+                    if (inst.opcode === 'INIT') {
+                         stageObjects[inst.arg] = { name: inst.arg, x: 0, y: 0, size: 20, stretch_x: 1, stretch_y: 1, color: 'white', rotation: 0, layer: 0 };
+                    } else if (inst.opcode === 'CREATE_ARRAY') {
+                        variables[inst.arg] = [];
+                    }
+                });
+                
+                this.processes = [{ id: 'main', pc: 0, callStack: [], loopStack: [], selfContext: null, waitUntil: 0 }];
+            },
+
+            runFrame(timestamp) {
+                for (let i = this.processes.length - 1; i >= 0; i--) {
+                    const process = this.processes[i];
+                    if (timestamp < process.waitUntil) continue;
+
+                    let instructionsThisTurn = 0;
+                    while (instructionsThisTurn < instructionLimit) {
+                        if (process.pc >= this.program.instructions.length) {
+                            this.processes.splice(i, 1);
+                            break;
+                        }
+
+                        const instruction = this.program.instructions[process.pc];
+                        //logToConsole(`[PC:${process.pc}] ${this.stringifyInstruction(instruction)}`, 'debug');
+                        
+                        let jumped = false;
+                        
+                        try {
+                            switch(instruction.opcode) {
+                                case 'NOOP':
+                                    break;
+                                case 'SET': {
+                                    const value = this.evaluate(instruction.value, process);
+                                    this.assign(instruction.target, value, process);
+                                    break;
+                                }
+                                case 'JUMP_IF_FALSE': {
+                                    const condition = this.evaluate(instruction.condition, process);
+                                    if (!condition) {
+                                        process.pc = instruction.targetPc;
+                                        jumped = true;
+                                    }
+                                    break;
+                                }
+                                case 'JUMP': {
+                                    process.pc = instruction.targetPc;
+                                    jumped = true;
+                                    break;
+                                }
+                                case 'LOG': {
+                                    const value = this.evaluate(instruction.value, process);
+                                    logToConsole(value);
+                                    break;
+                                }
+                                case 'SLEEP': {
+                                    const durationSeconds = this.evaluate(instruction.duration, process);
+                                    process.waitUntil = timestamp + durationSeconds * 1000;
+                                    break;
+                                }
+                            }
+                        } catch(e) {
+                            logToConsole(`Error de ejecución en línea ${instruction.line}: ${e.message}`, 'error');
+                            if (editor) {
+                                editor.deltaDecorations([], [{ range: new monaco.Range(instruction.line, 1, instruction.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
+                            }
+                            stopExecution();
+                            return;
+                        }
+
+                        if (!jumped) {
+                            process.pc++;
+                        }
+
+                        if (instruction.opcode === 'SLEEP') {
+                            break;
+                        }
+                        
+                        instructionsThisTurn++;
+                    }
+                }
+            },
+
+            stringifyInstruction(inst) {
+                let str = inst.opcode;
+                if (inst.arg) str += ` ${inst.arg}`;
+                if (inst.target) str += ` ${this.stringifyTarget(inst.target)}`;
+                if (inst.value) str += ` to ${this.stringifyExpression(inst.value)}`;
+                if (inst.condition) str += ` if ${this.stringifyExpression(inst.condition)}`;
+                if (inst.duration) str += ` ${this.stringifyExpression(inst.duration)}`;
+                if (inst.targetPc != null && inst.targetPc > -1) str += ` -> JUMP to ${inst.targetPc}`;
+                return str;
+            },
+            stringifyTarget(target) {
+                if (!target) return '';
+                if (target.type === 'VARIABLE') return target.name;
+                if (target.type === 'PROPERTY') return `${target.objName}.${target.propName}`;
+                return '?TARGET?';
+            },
+            stringifyExpression(tokens) {
+                if (!tokens) return '';
+                return tokens.map(t => {
+                    if (t.type.startsWith('LITERAL')) return JSON.stringify(t.value);
+                    if (t.type === 'VARIABLE') return t.name;
+                    if (t.type === 'PROPERTY') return `${t.objName}.${t.propName}`;
+                    if (t.type === 'OPERATOR') return t.value;
+                    return '?TOKEN?';
+                }).join(' ');
+            },
+
+            evaluate(tokens, process) {
+                if (!tokens) return undefined;
+                const stack = [];
+                for(const token of tokens) {
+                    if (token.type.startsWith('LITERAL')) {
+                        stack.push(token.value);
+                    } else if (token.type === 'VARIABLE') {
+                        if (!(token.name in variables)) throw new Error(`Variable '${token.name}' no definida.`);
+                        stack.push(variables[token.name]);
+                    } else if (token.type === 'PROPERTY') {
+                        if (!stageObjects[token.objName]) throw new Error(`Objeto '${token.objName}' no existe.`);
+                        stack.push(stageObjects[token.objName][token.propName]);
+                    } else if (token.type === 'OPERATOR') {
+                        const b = stack.pop();
+                        const a = stack.pop();
+                        switch(token.value) {
+                            case '+': stack.push(a + b); break;
+                            case '-': stack.push(a - b); break;
+                            case '*': stack.push(a * b); break;
+                            case '/': stack.push(a / b); break;
+                            case '>': stack.push(a > b); break;
+                            case '<': stack.push(a < b); break;
+                            case '=':
+                            case '==': stack.push(a == b); break;
+                            case 'and': stack.push(a && b); break;
+                            case 'or': stack.push(a || b); break;
+                        }
+                    }
+                }
+                return stack[0];
+            },
+
+            assign(target, value, process) {
+                if (target.type === 'VARIABLE') {
+                    variables[target.name] = value;
+                } else if (target.type === 'PROPERTY') {
+                    if (!stageObjects[target.objName]) throw new Error(`Objeto '${target.objName}' no existe.`);
+                    stageObjects[target.objName][target.propName] = value;
+                }
+            }
+        };
+
+        // --- Monaco Editor Setup ---
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            monaco.languages.register({ id: 'glim' });
+            monaco.editor.defineTheme('glim-dark', {
+                base: 'vs-dark', inherit: true,
+                rules: [
+                    { token: 'keyword', foreground: 'C586C0' }, { token: 'tag', foreground: '4EC9B0', fontStyle: 'bold' },
+                    { token: 'property', foreground: '9CDCFE' }, { token: 'comment', foreground: '6A9955' },
+                    { token: 'string', foreground: 'CE9178' }, { token: 'number', foreground: 'B5CEA8' },
+                    { token: 'identifier', foreground: 'DCDCAA' }, { token: 'operator', foreground: 'D4D4D4'}
+                ],
+                colors: { 'editor.background': '#202124', 'editor.foreground': '#E8EAED', 'editorCursor.foreground': '#AEAFAD', 'editor.lineHighlightBackground': '#2D2D30', 'editorLineNumber.foreground': '#858585', 'editor.selectionBackground': '#3A3D41' }
+            });
+            
+            editor = monaco.editor.create(document.getElementById('editor-container'), { value: defaultCode, language: 'glim', theme: 'glim-dark', automaticLayout: true, fontFamily: 'Fira Code', fontSize: 16, minimap: { enabled: false }, wordWrap: 'on', fontLigatures: true });
+            editor.onDidChangeModelContent(e => { 
+                if (!e.isFlush) {
+                    markProjectAsDirty();
+                    if (autoRunEnabled) {
+                        if (isRunning) stopExecution();
+                        startExecution();
+                    }
+                }
+            });
+        });
+        
+
+        // --- Main Execution Flow ---
+        function startExecution() {
+            document.getElementById('console-output').innerHTML = '';
+            if (editor) editor.deltaDecorations([], []); 
+
+            logToConsole('Compilando...', 'log');
+            const result = Compiler.compile(editor.getValue());
+
+            if (result.error) {
+                logToConsole(`Error de sintaxis en línea ${result.line}: ${result.message}`, 'error');
+                if (editor) {
+                    editor.deltaDecorations([], [{ range: new monaco.Range(result.line, 1, result.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
+                }
+                return;
+            }
+            
+            compiledProgram = result;
+            logToConsole('Compilación exitosa. Iniciando ejecución...', 'log');
+
+            VM.init(compiledProgram);
+            VM.start();
+            
+            isRunning = true;
+            document.getElementById('runButton').textContent = 'Detener';
+            document.getElementById('runButton').classList.replace('bg-cyan-500', 'bg-red-500');
+            lastFrameTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function stopExecution() {
+            if (isRunning) {
+                logToConsole('Ejecución detenida.', 'log');
+                Object.values(sounds).forEach(sound => { sound.pause(); sound.currentTime = 0; });
+            }
+            isRunning = false;
+            compiledProgram = null;
+            VM.processes = [];
+            document.getElementById('runButton').textContent = 'Ejecutar';
+            document.getElementById('runButton').classList.replace('bg-red-500', 'bg-cyan-500');
+        }
+
+        function gameLoop(timestamp) {
+             if (!isRunning) return;
+             requestAnimationFrame(gameLoop);
+             
+             const elapsed = timestamp - lastFrameTime;
+             if (elapsed < frameDelay) return;
+             lastFrameTime = timestamp - (elapsed % frameDelay);
+
+             VM.runFrame(timestamp);
+             updateCanvas();
+             updateInspector();
+        }
+
+        // --- UI & Drawing ---
+        
+        function updateCanvas() {
+            const canvas = document.getElementById('stage');
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return;
+            canvas.width = stageWidth;
+            canvas.height = stageHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (currentBackground) ctx.drawImage(currentBackground, 0, 0, canvas.width, canvas.height);
+            
+            const cam = { x: variables.camera_x || 0, y: variables.camera_y || 0, zoom: variables.camera_zoom || 1 };
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(cam.zoom, cam.zoom);
+            ctx.translate(-cam.x, -cam.y);
+
+            if (showGrid) drawGrid(ctx, cam);
+
+            const sortedObjects = Object.values(stageObjects).sort((a,b) => (a.layer || 0) - (b.layer || 0));
+            for (const obj of sortedObjects) {
+                const canvasX = (obj.x || 0);
+                const canvasY = -(obj.y || 0); // Invert Y for standard Cartesian coordinates
+                ctx.save();
+                ctx.translate(canvasX, canvasY);
+                if(obj.rotation) ctx.rotate(-obj.rotation * Math.PI / 180); // Rotate clockwise
+                
+                const size = obj.size || 20;
+                const w = size * 2 * (obj.stretch_x || 1);
+                const h = size * 2 * (obj.stretch_y || 1);
+
+                if (obj.costume && costumes[obj.costume]) {
+                    ctx.drawImage(costumes[obj.costume], -w/2, -h/2, w, h);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size, 0, Math.PI * 2);
+                    ctx.fillStyle = obj.color || 'white';
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                if(showNames) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = '14px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(obj.name, canvasX, canvasY + h / 2 + 15);
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawGrid(ctx, camera) {
+            if(!ctx) return;
+            const gridSize = 50; 
+            const lineWidth = 1 / camera.zoom;
+            ctx.lineWidth = lineWidth;
+            
+            const viewWidth = ctx.canvas.width / camera.zoom; 
+            const viewHeight = ctx.canvas.height / camera.zoom;
+
+            const worldLeft = camera.x - viewWidth / 2; 
+            const worldRight = camera.x + viewWidth / 2;
+            const worldTop = camera.y + viewHeight / 2; 
+            const worldBottom = camera.y - viewHeight / 2;
+
+            const startX = Math.floor(worldLeft / gridSize) * gridSize; 
+            const endX = Math.ceil(worldRight / gridSize) * gridSize;
+            const startY = Math.floor(worldBottom / gridSize) * gridSize; 
+            const endY = Math.ceil(worldTop / gridSize) * gridSize;
+
+            ctx.beginPath(); 
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            for (let x = startX; x <= endX; x += gridSize) { ctx.moveTo(x, worldBottom); ctx.lineTo(x, worldTop); }
+            for (let y = startY; y <= endY; y += gridSize) { ctx.moveTo(worldLeft, y); ctx.lineTo(worldRight, y); }
+            ctx.stroke();
+            
+            ctx.beginPath(); 
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.moveTo(0, worldBottom); ctx.lineTo(0, worldTop);
+            ctx.moveTo(worldLeft, 0); ctx.lineTo(worldRight, 0);
+            ctx.stroke();
+        }
+
+        function updateInspector() {
+            const inspectorOutput = document.getElementById('inspector-output');
+            if (!showInspector) return;
+            inspectorOutput.innerHTML = '';
+            const list = document.createElement('ul');
+            list.className = "space-y-1";
+
+            let varHtml = '<li class="text-amber-300 font-bold">Variables:</li>';
+            for (const [key, value] of Object.entries(variables)) {
+                let displayValue = (Array.isArray(value)) ? `[${value.join(', ')}]` : value;
+                varHtml += `<li><span class="font-semibold text-yellow-400">${key}</span> &rarr; <span class="text-cyan-400">${displayValue}</span></li>`;
+            }
+            list.innerHTML += varHtml;
+            
+            let objHtml = '<li class="text-lime-300 font-bold mt-2">Objetos:</li>';
+             Object.values(stageObjects).sort((a,b) => a.name.localeCompare(b.name)).forEach(obj => {
+                let props = '';
+                for(const [key, value] of Object.entries(obj)) {
+                    if (key === 'name') continue;
+                    let displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+                    props += `<span class="text-gray-400">${key}:</span> <span class="text-cyan-400">${displayValue}</span> `;
+                }
+                objHtml += `<li><span class="font-semibold text-green-400">${obj.name}</span> &rarr; ${props}</li>`;
+            });
+            list.innerHTML += objHtml;
+
+            inspectorOutput.appendChild(list);
+        }
+
+        function logToConsole(message, type = 'log') { 
+            const consoleOutput = document.getElementById('console-output');
+            const msgEl = document.createElement('div');
+            const typeColors = { log: 'text-gray-300', error: 'text-red-400', warn: 'text-yellow-400', debug: 'text-gray-500' };
+            msgEl.className = `whitespace-pre-wrap ${typeColors[type] || 'text-gray-300'}`;
+            let displayMessage = (Array.isArray(message)) ? `[${message.join(', ')}]` : message;
+            msgEl.textContent = `> ${displayMessage}`;
+            consoleOutput.appendChild(msgEl);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // --- UI Management ---
+        function markProjectAsDirty() {
+            if (currentProjectName && !isProjectDirty) {
+                isProjectDirty = true;
+                document.getElementById('save-button').textContent = `Guardar en ${currentProjectName}`;
+                document.getElementById('save-button').classList.remove('hidden');
+            }
+        }
+        function resetProjectState() {
+            currentProjectName = null;
+            isProjectDirty = false;
+            window.currentFileHandle = null;
+            document.getElementById('save-button').classList.add('hidden');
+        }
+
+        function setupMenus() {
+            const menus = { "archivo": { button: document.getElementById('menu-archivo-button'), dropdown: document.getElementById('menu-archivo-dropdown') }, "editar": { button: document.getElementById('menu-editar-button'), dropdown: document.getElementById('menu-editar-dropdown') } };
+            const closeAllMenus = () => Object.values(menus).forEach(menu => menu.dropdown.classList.add('hidden'));
+            Object.values(menus).forEach(menu => {
+                menu.button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isHidden = menu.dropdown.classList.contains('hidden');
+                    closeAllMenus();
+                    if (isHidden) menu.dropdown.classList.remove('hidden');
+                });
+            });
+            window.addEventListener('click', closeAllMenus);
+        }
+
+        function setupCostumeManager() {
+            document.getElementById('costumes-button').addEventListener('click', () => document.getElementById('costume-modal').classList.remove('hidden'));
+            document.getElementById('close-costume-modal').addEventListener('click', () => document.getElementById('costume-modal').classList.add('hidden'));
+            document.getElementById('costume-uploader').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) { return; }
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let name = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+                        let originalName = name;
+                        let counter = 1;
+                        while(costumes[name]) { name = `${originalName}_${counter++}`; }
+                        costumes[name] = img;
+                        addCostumeToGallery(name, img.src);
+                        markProjectAsDirty();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+                e.target.value = null;
+            });
+            document.getElementById('costume-gallery').addEventListener('click', e => {
+                if (e.target.classList.contains('delete-costume-btn')) {
+                    const name = e.target.dataset.name;
+                    delete costumes[name];
+                    e.target.closest('div').remove();
+                    markProjectAsDirty();
+                }
+            });
+        }
+        function addCostumeToGallery(name, src) { 
+            const div = document.createElement('div');
+            div.className = 'flex flex-col items-center gap-2 p-2 bg-gray-700 rounded-md relative group';
+            div.innerHTML = `<img src="${src}" class="w-16 h-16 object-contain" alt="${name}"><input type="text" value="${name}" data-old-name="${name}" class="bg-gray-900 text-center text-xs w-full rounded p-1 costume-name-input"><button data-name="${name}" class="delete-costume-btn absolute top-0 right-0 bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>`;
+            document.getElementById('costume-gallery').appendChild(div);
+        }
+        
+        function setupSoundManager() {
+            document.getElementById('sounds-button').addEventListener('click', () => document.getElementById('sound-modal').classList.remove('hidden'));
+            document.getElementById('close-sound-modal').addEventListener('click', () => document.getElementById('sound-modal').classList.add('hidden'));
+            document.getElementById('sound-uploader').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    let name = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+                    const audio = new Audio(event.target.result);
+                    sounds[name] = audio;
+                    addSoundToGallery(name);
+                    markProjectAsDirty();
+                };
+                reader.readAsDataURL(file);
+                e.target.value = null;
+            });
+            document.getElementById('sound-gallery').addEventListener('click', e => {
+                if (e.target.classList.contains('delete-sound-btn')) {
+                    const name = e.target.dataset.name;
+                    if (sounds[name]) {
+                        sounds[name].pause();
+                        sounds[name].currentTime = 0;
+                    }
+                    delete sounds[name];
+                    e.target.closest('div').remove();
+                    markProjectAsDirty();
+                }
+                if (e.target.classList.contains('play-sound-btn')) {
+                    const name = e.target.dataset.soundName;
+                    if (sounds[name]) {
+                        sounds[name].currentTime = 0;
+                        sounds[name].play();
+                    }
+                }
+            });
+        }
+        function addSoundToGallery(name) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-2 bg-gray-700 rounded-md group';
+            div.innerHTML = `<span class="text-white">${name}</span><div class="flex items-center gap-2"><button data-sound-name="${name}" class="play-sound-btn bg-cyan-600 px-2 py-1 rounded text-xs">Play</button><button data-name="${name}" class="delete-sound-btn bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">&times;</button></div>`;
+            document.getElementById('sound-gallery').appendChild(div);
+        }
+
+        // --- Event Listeners and Initializers ---
+        window.onload = () => {
+            document.getElementById('runButton').addEventListener('click', () => { if (isRunning) stopExecution(); else startExecution(); });
+            document.getElementById('menu-nuevo').addEventListener('click', (e) => { e.preventDefault(); stopExecution(); resetProjectState(); if (editor) editor.setValue(defaultCode); stageObjects = {}; costumes = {}; sounds = {}; document.getElementById('sound-gallery').innerHTML = ''; document.getElementById('costume-gallery').innerHTML = ''; updateCanvas(); });
+            
+            // Other menu items and modals setup...
+            
+            document.getElementById('menu-mostrar-cuadricula').addEventListener('click', (e) => { e.preventDefault(); showGrid = !showGrid; e.target.classList.toggle('checked', showGrid); if (!isRunning) updateCanvas(); });
+            document.getElementById('menu-mostrar-nombres').addEventListener('click', (e) => { e.preventDefault(); showNames = !showNames; e.target.classList.toggle('checked', showNames); if (!isRunning) updateCanvas(); });
+            document.getElementById('menu-mostrar-inspector').addEventListener('click', (e) => { e.preventDefault(); showInspector = !showInspector; e.target.classList.toggle('checked', showInspector); document.getElementById('inspector-panel').classList.toggle('hidden', !showInspector); if(showInspector) updateInspector(); });
+            document.getElementById('menu-auto-ejecucion').addEventListener('click', (e) => { e.preventDefault(); autoRunEnabled = !autoRunEnabled; e.target.classList.toggle('checked', autoRunEnabled); logToConsole(`Auto-ejecución ${autoRunEnabled ? 'activada' : 'desactivada'}.`, 'log'); });
+            document.getElementById('clear-console-button').addEventListener('click', () => { document.getElementById('console-output').innerHTML = ''; });
+
+
+            // Input Listeners
+            window.addEventListener('keydown', e => { inputState.keys[e.key] = true; });
+            window.addEventListener('keyup', e => { inputState.keys[e.key] = false; });
+            document.getElementById('stage').addEventListener('mousemove', e => {
+                const rect = e.target.getBoundingClientRect();
+                const canvasX = e.clientX - rect.left;
+                const canvasY = e.clientY - rect.top;
+                variables.mouse_x = canvasX - stageWidth / 2;
+                variables.mouse_y = -(canvasY - stageHeight / 2);
+            });
+
+             setupCostumeManager(); 
+             setupSoundManager();
+             //setupExtensionManager();
+             setupMenus(); 
+             updateCanvas();
+        };
+
+    </script>
+</body>
+</html>
+
