@@ -178,7 +178,7 @@
         let editor;
         let stageObjects = {}, variables = {};
         let costumes = {}, sounds = {}, currentBackground = null;
-        let isRunning = false, compiledProgram = null;
+        let isRunning = false, compiledProgram = null, editorErrorDecorations = [];
         
         // --- CONFIGURABLE STATE ---
         let stageWidth = 640, stageHeight = 360, showGrid = false, showNames = false, showInspector = false, autoRunEnabled = false;
@@ -193,32 +193,32 @@
         window.currentFileHandle = null;
 
         const defaultCode = `# ¡Bienvenido a Glim!
-# Este es un ejemplo para empezar.
-# Haz clic en "Ejecutar" para verlo en acción.
+# Usa las teclas A y D para mover el jugador.
+# El cursor azul seguirá tu ratón.
 
-init bola
-bola.color = "#38bdf8" # Color cian
-bola.size = 30
+# Inicializa el jugador y el cursor
+init jugador
+jugador.color = "#f59e0b" # Naranja
+jugador.size = 25
+jugador.y = -150
 
-# Variables para controlar el movimiento
-set velocidad_x to 4
-set velocidad_y to 3
+init mira
+mira.color = "#38bdf8" # Cian
+mira.size = 15
 
-# Bucle principal infinito para la animación
+# Bucle principal del juego
 while 1 = 1
-  # Mover la bola
-  set bola.x to bola.x + velocidad_x
-  set bola.y to bola.y + velocidad_y
+  # Mover el jugador con las teclas
+  if key a pressed
+    jugador.x = jugador.x - 5
+  
+  if key d pressed
+    jugador.x = jugador.x + 5
 
-  # Rebotar en los bordes horizontales (ancho/2)
-  if bola.x > 320 or bola.x < -320
-    set velocidad_x to velocidad_x * -1
+  # El cursor sigue al ratón
+  set mira.x to mouse_x
+  set mira.y to mouse_y
 
-  # Rebotar en los bordes verticales (alto/2)
-  if bola.y > 180 or bola.y < -180
-    set velocidad_y to velocidad_y * -1
-
-  # Pequeña pausa para controlar la velocidad del bucle
   sleep 0.016
 endwhile
 `;
@@ -266,22 +266,28 @@ endwhile
 
                     const parts = trimmedLine.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
                     let command = parts[0].toLowerCase();
-                    let isAssignment = parts.length > 1 && parts[1] === '=';
+                    const isAssignment = parts.length > 1 && parts[1] === '=';
+                    const knownCommands = ['init', 'delete', 'goto', 'call', 'log', 'sleep', 'create', 'set', 'if', 'while', 'endwhile'];
 
-                    if (isAssignment) {
-                        command = 'set_shorthand';
-                    }
-                    
-                    if (command.endsWith(':')) {
-                        labels[command.slice(0, -1)] = instructions.length;
-                        instructions.push({ opcode: 'NOOP', line: lineNum });
-                        continue;
-                    }
-
-                    let instruction = { opcode: command.toUpperCase(), line: lineNum };
-
+                    let instructionType;
                     try {
-                        switch (command) {
+                        if (knownCommands.includes(command)) {
+                            instructionType = command;
+                        } else if (isAssignment) {
+                            instructionType = 'set_shorthand';
+                        } else if (command.endsWith(':')) {
+                            instructionType = 'label';
+                        } else {
+                            throw `Comando desconocido: '${command}'.`;
+                        }
+
+                        let instruction = { opcode: instructionType.toUpperCase(), line: lineNum };
+
+                        switch (instructionType) {
+                            case 'label':
+                                labels[command.slice(0, -1)] = instructions.length;
+                                instruction.opcode = 'NOOP';
+                                break;
                             case 'init':
                             case 'delete':
                             case 'goto':
@@ -307,7 +313,7 @@ endwhile
                                 instruction.arg = parts[2];
                                 break;
                             case 'set': {
-                                const toIndex = parts.indexOf('to');
+                                const toIndex = parts.findIndex(p => p.toLowerCase() === 'to');
                                 if (toIndex === -1 || toIndex < 1 || toIndex === parts.length - 1) throw `Sintaxis inválida. Use 'set <destino> to <valor>'.`;
                                 const targetStr = parts.slice(1, toIndex).join(' ');
                                 const valueStr = parts.slice(toIndex + 1).join(' ');
@@ -349,14 +355,11 @@ endwhile
                                 instructions[block.index].targetPc = instructions.length + 1;
                                 break;
                             }
-                            default:
-                                throw `Comando desconocido: '${command}'.`;
                         }
+                        instructions.push(instruction);
                     } catch (e) {
                         return SyntaxError(e, lineNum);
                     }
-
-                    instructions.push(instruction);
                 }
 
                 while (ifStack.length > 0) {
@@ -384,6 +387,12 @@ endwhile
                 const precedence = { 'or': 1, 'and': 2, '>': 3, '<': 3, '=': 3, '==': 3, '+': 4, '-': 4, '*': 5, '/': 5 };
                 const output = [];
                 const operators = [];
+
+                // Handle 'key ... pressed' as a special case before tokenizing
+                const keyPressMatch = str.match(/^key\s+([^\s]+)\s+pressed$/i);
+                if (keyPressMatch) {
+                    return [{ type: 'KEY_PRESSED', key: keyPressMatch[1] }];
+                }
 
                 const tokenRegex = /\s*("[^"]*"|'[^']*'|\b(and|or)\b|[a-zA-Z_][\w.]*|-?\d+(?:\.\d+)?|[<>=]+|[+\-*/()])\s*/g;
                 let preTokens = [...str.matchAll(tokenRegex)].map(m => m[1]);
@@ -521,7 +530,7 @@ endwhile
                         } catch(e) {
                             logToConsole(`Error de ejecución en línea ${instruction.line}: ${e.message}`, 'error');
                             if (editor) {
-                                editor.deltaDecorations([], [{ range: new monaco.Range(instruction.line, 1, instruction.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
+                                editorErrorDecorations = editor.deltaDecorations(editorErrorDecorations, [{ range: new monaco.Range(instruction.line, 1, instruction.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
                             }
                             stopExecution();
                             return;
@@ -540,44 +549,20 @@ endwhile
                 }
             },
 
-            stringifyInstruction(inst) {
-                let str = inst.opcode;
-                if (inst.arg) str += ` ${inst.arg}`;
-                if (inst.target) str += ` ${this.stringifyTarget(inst.target)}`;
-                if (inst.value) str += ` to ${this.stringifyExpression(inst.value)}`;
-                if (inst.condition) str += ` if ${this.stringifyExpression(inst.condition)}`;
-                if (inst.duration) str += ` ${this.stringifyExpression(inst.duration)}`;
-                if (inst.targetPc != null && inst.targetPc > -1) str += ` -> JUMP to ${inst.targetPc}`;
-                return str;
-            },
-            stringifyTarget(target) {
-                if (!target) return '';
-                if (target.type === 'VARIABLE') return target.name;
-                if (target.type === 'PROPERTY') return `${target.objName}.${target.propName}`;
-                return '?TARGET?';
-            },
-            stringifyExpression(tokens) {
-                if (!tokens) return '';
-                return tokens.map(t => {
-                    if (t.type.startsWith('LITERAL')) return JSON.stringify(t.value);
-                    if (t.type === 'VARIABLE') return t.name;
-                    if (t.type === 'PROPERTY') return `${t.objName}.${t.propName}`;
-                    if (t.type === 'OPERATOR') return t.value;
-                    return '?TOKEN?';
-                }).join(' ');
-            },
-
             evaluate(tokens, process) {
                 if (!tokens) return undefined;
                 const stack = [];
                 for(const token of tokens) {
-                    if (token.type.startsWith('LITERAL')) {
+                    if (token.type === 'KEY_PRESSED') {
+                        stack.push(!!inputState.keys[token.key]);
+                    } else if (token.type.startsWith('LITERAL')) {
                         stack.push(token.value);
                     } else if (token.type === 'VARIABLE') {
                         if (!(token.name in variables)) throw new Error(`Variable '${token.name}' no definida.`);
                         stack.push(variables[token.name]);
                     } else if (token.type === 'PROPERTY') {
                         if (!stageObjects[token.objName]) throw new Error(`Objeto '${token.objName}' no existe.`);
+                        if (!(token.propName in stageObjects[token.objName])) throw new Error(`Propiedad '${token.propName}' no encontrada en el objeto '${token.objName}'.`);
                         stack.push(stageObjects[token.objName][token.propName]);
                     } else if (token.type === 'OPERATOR') {
                         const b = stack.pop();
@@ -640,7 +625,9 @@ endwhile
         // --- Main Execution Flow ---
         function startExecution() {
             document.getElementById('console-output').innerHTML = '';
-            if (editor) editor.deltaDecorations([], []); 
+            if (editor) {
+                editorErrorDecorations = editor.deltaDecorations(editorErrorDecorations, []);
+            }
 
             logToConsole('Compilando...', 'log');
             const result = Compiler.compile(editor.getValue());
@@ -648,7 +635,7 @@ endwhile
             if (result.error) {
                 logToConsole(`Error de sintaxis en línea ${result.line}: ${result.message}`, 'error');
                 if (editor) {
-                    editor.deltaDecorations([], [{ range: new monaco.Range(result.line, 1, result.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
+                    editorErrorDecorations = editor.deltaDecorations(editorErrorDecorations, [{ range: new monaco.Range(result.line, 1, result.line, 100), options: { isWholeLine: true, className: 'error-line' } }]);
                 }
                 return;
             }
