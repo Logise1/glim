@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentación de Glim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .prose h1, .prose h2, .prose h3, .prose h4 { font-weight: 700; color: #E2E8F0; scroll-margin-top: 4rem; }
+        .prose h1 { border-bottom: 1px solid #475569; padding-bottom: 0.5rem; font-size: 2.25rem; }
+        .prose h2 { border-bottom: 1px solid #334155; padding-bottom: 0.4rem; font-size: 1.875rem; }
+        .prose p, .prose li { color: #CBD5E1; }
+        .prose strong { color: #F1F5F9; }
+        .prose a { color: #7DD3FC; text-decoration: none; }
+        .prose a:hover { text-decoration: underline; }
+        .prose code { background-color: #1E293B; color: #F87171; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: 'Fira Code', monospace; font-size: 0.9em; }
+        .code-block { background-color: #0F172A; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; margin: 1rem 0; overflow-x: auto; }
+        .code-block pre { margin: 0; font-family: 'Fira Code', monospace; color: #E2E8F0; }
+        .sidebar-link.active { background-color: #38BDF8; color: #0F172A; font-weight: 600; }
+        .cta-button { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background-color: #38BDF8; color: #020617; font-weight: 600; border-radius: 0.5rem; text-decoration: none; transition: background-color 0.2s; }
+        .cta-button:hover { background-color: #7DD3FC; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-300">
+
+    <div class="container mx-auto max-w-7xl px-4 py-8 md:py-12">
+        <div class="flex flex-col md:flex-row gap-8">
+
+            <aside class="w-full md:w-64 flex-shrink-0">
+                <div class="sticky top-8">
+                    <h2 class="text-xl font-bold text-white mb-4">Documentación de Glim</h2>
+                    <nav id="sidebar-nav" class="flex flex-col space-y-1">
+                        <a href="#introduccion" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Introducción</a>
+                        <a href="#primeros-pasos" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Primeros Pasos</a>
+                        
+                        <h3 class="px-4 pt-4 pb-1 text-sm font-semibold text-sky-400 uppercase tracking-wider">Comandos Básicos</h3>
+                        <a href="#objetos" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Gestión de Objetos</a>
+                        <a href="#variables" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Variables y Propiedades</a>
+                        
+                        <h3 class="px-4 pt-4 pb-1 text-sm font-semibold text-sky-400 uppercase tracking-wider">Estructuras de Control</h3>
+                        <a href="#condicionales" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Condicionales</a>
+                        <a href="#bucles" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Bucles</a>
+                        <a href="#procedimientos" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Procedimientos</a>
+
+                        <h3 class="px-4 pt-4 pb-1 text-sm font-semibold text-sky-400 uppercase tracking-wider">Funcionalidades</h3>
+                        <a href="#entrada" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Entrada (Teclado/Ratón)</a>
+                        <a href="#fisicas" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Físicas y Colisiones</a>
+                        <a href="#visuales" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Visuales y Renderizado</a>
+                        <a href="#audio" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Audio</a>
+                        <a href="#arrays" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Arrays (Listas)</a>
+
+                        <h3 class="px-4 pt-4 pb-1 text-sm font-semibold text-sky-400 uppercase tracking-wider">Avanzado</h3>
+                        <a href="#depuracion" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Depuración</a>
+                        <a href="#buenas-practicas" class="sidebar-link px-4 py-2 rounded-md transition-colors hover:bg-slate-700">Buenas Prácticas</a>
+                    </nav>
+                </div>
+            </aside>
+
+            <main class="flex-grow prose prose-slate max-w-none">
+                <section id="introduccion">
+                    <h1>Bienvenido a Glim</h1>
+                    <p><strong>Glim</strong> es un lenguaje de programación simple y directo, diseñado para que la creación de escenas, animaciones y juegos sea una tarea fácil y divertida. Su sintaxis, inspirada en lenguajes declarativos, se centra en la manipulación de objetos en un escenario 2D, lo que lo convierte en una herramienta ideal para principiantes y para prototipar rápidamente ideas visuales.</p>
+                </section>
+
+                <section id="primeros-pasos">
+                    <h2>Primeros Pasos: Una Bola Rebotando</h2>
+                    <p>La mejor manera de aprender es haciendo. Al abrir el editor de Glim, verás este código. ¡Presiona "Ejecutar" para verlo en acción!</p>
+                    <div class="code-block"><pre># ¡Bienvenido a Glim!
+init bola
+bola.color = "#38bdf8"
+bola.size = 30
+
+set velocidad_x to 4
+set velocidad_y to 3
+
+while 1 = 1
+  set bola.x to bola.x + velocidad_x
+  set bola.y to bola.y + velocidad_y
+
+  if bola.x > 320 or bola.x < -320
+    set velocidad_x to velocidad_x * -1
+
+  if bola.y > 180 or bola.y < -180
+    set velocidad_y to velocidad_y * -1
+
+  sleep 0.016
+endwhile</pre></div>
+                    <p>Este código hace lo siguiente:</p>
+                    <ol>
+                        <li><strong>init bola:</strong> Crea un objeto llamado `bola`.</li>
+                        <li><strong>bola.color / bola.size:</strong> Cambia su apariencia.</li>
+                        <li><strong>set velocidad...:</strong> Crea dos "cajas" (variables) para guardar la velocidad.</li>
+                        <li><strong>while 1 = 1:</strong> Inicia un bucle infinito que se ejecuta una y otra vez, creando la animación.</li>
+                        <li><strong>set bola.x...:</strong> Mueve la bola en cada fotograma.</li>
+                        <li><strong>if...:</strong> Comprueba si la bola ha tocado un borde y, si es así, invierte su dirección.</li>
+                        <li><strong>sleep...:</strong> Hace una pequeña pausa para que el bucle se ejecute a unos 60 fotogramas por segundo.</li>
+                    </ol>
+                </section>
+                
+                <section id="objetos">
+                    <h2>Gestión de Objetos</h2>
+                    <p>Los objetos son los "actores" en tu escenario. Puedes crearlos, clonarlos y destruirlos.</p>
+                    <h4>init</h4>
+                    <p>Crea un nuevo objeto. <strong>Sintaxis:</strong> <code>init &lt;nombre_objeto&gt;</code></p>
+                    <h4>clone</h4>
+                    <p>Crea una copia de un objeto existente. Es muy útil para generar enemigos o proyectiles. <strong>Sintaxis:</strong> <code>clone &lt;original&gt; as &lt;nuevo_nombre&gt;</code></p>
+                    <h4>delete</h4>
+                    <p>Elimina un objeto del escenario. <strong>Sintaxis:</strong> <code>delete &lt;nombre_objeto&gt;</code></p>
+                </section>
+
+                <section id="variables">
+                    <h2>Variables y Propiedades</h2>
+                    <p>Las variables son contenedores para guardar información como puntuaciones o velocidades. Las propiedades son "ajustes" de un objeto, como su posición o color.</p>
+                    <h4>set / =</h4>
+                    <p>Asigna un valor a una variable o a una propiedad de un objeto. Ambas formas son equivalentes.</p>
+                    <div class="code-block"><pre>set puntuacion to 100
+jugador.x = 50</pre></div>
+                    <h4>Propiedades Principales de un Objeto</h4>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-800"><tr><th class="p-3 border-b border-slate-700">Propiedad</th><th class="p-3 border-b border-slate-700">Descripción</th></tr></thead>
+                            <tbody>
+                                <tr class="border-b border-slate-700"><td class="p-3"><code>x</code>, <code>y</code></td><td class="p-3">Coordenadas del centro del objeto. El centro del escenario es (0, 0).</td></tr>
+                                <tr class="border-b border-slate-700"><td class="p-3"><code>size</code></td><td class="p-3">Radio del objeto (o tamaño base si usa un disfraz).</td></tr>
+                                <tr class="border-b border-slate-700"><td class="p-3"><code>color</code></td><td class="p-3">Color del objeto si no tiene disfraz (p.ej., "red", "#FF0000").</td></tr>
+                                <tr class="border-b border-slate-700"><td class="p-3"><code>rotation</code></td><td class="p-3">Rotación del objeto en grados (0-360).</td></tr>
+                                <tr class="border-b border-slate-700"><td class="p-3"><code>layer</code></td><td class="p-3">Capa de dibujado. Un número mayor se dibuja encima de un número menor.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+                <section id="condicionales">
+                    <h2>Condicionales (if)</h2>
+                    <p>Permiten que tu programa tome decisiones. El código indentado debajo de un <code>if</code> solo se ejecuta si la condición es verdadera.</p>
+                    <p><strong>Sintaxis:</strong> <code>if &lt;condición1&gt; [and/or &lt;condición2&gt;...]</code></p>
+                    <div class="code-block"><pre>if jugador.y < -200
+  log "¡El jugador ha caído!"
+  
+if puntuacion > 100 and vidas > 0
+  log "¡Pasando al siguiente nivel!"</pre></div>
+                </section>
+
+                <section id="bucles">
+                    <h2>Bucles (Loops)</h2>
+                    <p>Los bucles son fundamentales para la animación y la lógica repetitiva. Glim ofrece bucles estructurados que son más fáciles de leer y mantener que el antiguo <code>goto</code>.</p>
+                    <h4>while</h4>
+                    <p>Repite un bloque de código <strong>mientras</strong> una condición sea verdadera.</p>
+                    <div class="code-block"><pre>set contador to 10
+while contador > 0
+  log contador
+  set contador to contador - 1
+  sleep 1
+endwhile
+log "¡Despegue!"</pre></div>
+                    <h4>repeat</h4>
+                    <p>Repite un bloque de código un número específico de veces.</p>
+                     <div class="code-block"><pre># Crea 5 enemigos en posiciones aleatorias
+repeat 5 times
+  clone enemigo_base as "enemigo" + i
+  set enemigo.x to random from -300 to 300
+endrepeat</pre></div>
+                </section>
+
+                <section id="procedimientos">
+                    <h2>Procedimientos (Funciones)</h2>
+                    <p>Permiten agrupar código en bloques reutilizables para mantener tus programas organizados.</p>
+                    <h4>define / enddefine / call</h4>
+                    <p><code>define</code> crea un procedimiento y <code>call</code> lo ejecuta.</p>
+                     <div class="code-block"><pre>define reiniciar_jugador
+  set jugador.x to 0
+  set jugador.y to -150
+enddefine
+
+# ... más tarde en el código ...
+if vidas < 0
+  call reiniciar_jugador</pre></div>
+                </section>
+
+                <section id="entrada">
+                    <h2>Entrada (Teclado y Ratón)</h2>
+                    <p>Haz que tus creaciones sean interactivas.</p>
+                    <h4>key ... pressed</h4>
+                    <p>Comprueba si una tecla está siendo presionada. <strong>Sintaxis:</strong> <code>if key &lt;tecla&gt; pressed</code></p>
+                    <div class="code-block"><pre>if key d pressed
+  set jugador.x to jugador.x + 5</pre></div>
+                    <h4>Variables del Ratón</h4>
+                    <p>Glim actualiza automáticamente estas variables con la posición del cursor sobre el escenario.</p>
+                    <ul>
+                        <li><code>mouse_x</code>: Coordenada X del ratón.</li>
+                        <li><code>mouse_y</code>: Coordenada Y del ratón.</li>
+                    </ul>
+                    <div class="code-block"><pre># El objeto "mira" siempre sigue al ratón
+set mira.x to mouse_x
+set mira.y to mouse_y</pre></div>
+                </section>
+
+                <section id="fisicas">
+                     <h2>Físicas y Colisiones</h2>
+                    <h4>object ... touches</h4>
+                    <p>Comprueba si dos objetos se solapan. <strong>Sintaxis:</strong> <code>if object &lt;obj1&gt; touches &lt;obj2&gt;</code></p>
+                    <h4>random</h4>
+                    <p>Genera un número entero aleatorio. <strong>Sintaxis:</strong> <code>random from &lt;min&gt; to &lt;max&gt;</code></p>
+                    <h4>distance</h4>
+                    <p>Mide la distancia entre dos objetos. <strong>Sintaxis:</strong> <code>distance from &lt;obj1&gt; to &lt;obj2&gt;</code></p>
+                </section>
+
+                <section id="visuales">
+                    <h2>Visuales y Renderizado</h2>
+                    <h4>costume</h4>
+                    <p>Cambia la apariencia de un objeto por una imagen cargada. <strong>Sintaxis:</strong> <code>costume &lt;nombre_disfraz&gt; &lt;objeto&gt;</code></p>
+                    <h4>background</h4>
+                    <p>Establece una imagen como fondo del escenario. <strong>Sintaxis:</strong> <code>background &lt;nombre_disfraz&gt;</code></p>
+                    <h4>bring front / send back</h4>
+                    <p>Cambia el orden de dibujado de los objetos, manipulando su propiedad <code>layer</code>.</p>
+                    <div class="code-block"><pre>bring jugador front  # Pone al jugador en la capa superior
+send nubes back      # Pone las nubes en la capa inferior</pre></div>
+                </section>
+
+                <section id="audio">
+                    <h2>Audio</h2>
+                    <h4>play sound</h4>
+                    <p>Reproduce un sonido cargado. <strong>Sintaxis:</strong> <code>play sound "&lt;nombre_sonido&gt;"</code></p>
+                    <h4>stop sound</h4>
+                    <p>Detiene un sonido en reproducción. <strong>Sintaxis:</strong> <code>stop sound "&lt;nombre_sonido&gt;"</code></p>
+                </section>
+                
+                <section id="arrays">
+                    <h2>Arrays (Listas)</h2>
+                    <p>Los arrays son variables que pueden contener múltiples valores, como una lista. Son perfectos para gestionar grupos de objetos.</p>
+                    <h4>create array</h4>
+                    <p>Crea una lista vacía. <strong>Sintaxis:</strong> <code>create array &lt;nombre&gt;</code></p>
+                    <h4>push</h4>
+                    <p>Añade un elemento al final de la lista. <strong>Sintaxis:</strong> <code>push &lt;valor&gt; to &lt;nombre&gt;</code></p>
+                    <h4>get / set item</h4>
+                    <p>Accede o modifica un elemento por su posición (índice), que empieza en 0.
+                    <br><strong>Sintaxis Get:</strong> <code>get &lt;índice&gt; from &lt;nombre&gt;</code>
+                    <br><strong>Sintaxis Set:</strong> <code>set item &lt;índice&gt; of &lt;nombre&gt; to &lt;valor&gt;</code></p>
+                </section>
+
+                <section id="depuracion">
+                    <h2>Depuración</h2>
+                    <h4>log</h4>
+                    <p>La herramienta más importante para depurar. Imprime un mensaje o el valor de una variable en la consola de Glim.</p>
+                    <div class="code-block"><pre>log "Posición X del jugador:"
+log jugador.x</pre></div>
+                    <h4>El Inspector</h4>
+                    <p>Actívalo desde el menú "Editar". Muestra los valores de todas tus variables y las propiedades de todos los objetos en tiempo real. ¡Es extremadamente útil!</p>
+                </section>
+                
+                <section id="buenas-practicas">
+                    <h2>Buenas Prácticas</h2>
+                    <h4>Prefiere Bucles Estructurados</h4>
+                    <p>Siempre que sea posible, utiliza <code>while</code> y <code>repeat</code> en lugar de <code>goto</code>. Tu código será mucho más fácil de leer, entender y depurar. Reserva <code>goto</code> para saltos de estado muy simples (por ejemplo, saltar a una pantalla de "Game Over").</p>
+                    <h4>Usa Procedimientos</h4>
+                    <p>No pongas todo tu código en un solo bloque. Agrupa la lógica relacionada en procedimientos (<code>define</code>). Por ejemplo, crea un <code>define mover_jugador</code>, <code>define dibujar_enemigos</code>, etc. Esto hará que tu proyecto sea manejable a medida que crece.</p>
+                    <h4>Comenta tu Código</h4>
+                    <p>Usa <code>#</code> para dejar comentarios. Explica las partes complejas de tu lógica. ¡Tu yo del futuro (y otras personas) te lo agradecerá!</p>
+                </section>
+            </main>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('main section');
+            const navLinks = document.querySelectorAll('#sidebar-nav a');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id;
+                        navLinks.forEach(link => {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href') === `#${id}`) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                });
+            }, { rootMargin: "-20% 0px -70% 0px", threshold: 0.1 });
+            sections.forEach(section => observer.observe(section));
+        });
+    </script>
+</body>
+</html>
